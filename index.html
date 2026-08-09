@@ -248,6 +248,20 @@ td.pct-cell{text-align:right;color:var(--text3);font-family:'DM Mono',monospace;
 .perfil-badge{display:inline-flex;align-items:center;font-size:10.5px;font-weight:700;padding:4px 10px;border-radius:20px;white-space:nowrap}
 .empty-state{padding:4rem 1.5rem;text-align:center;color:var(--text3);font-size:13px;display:flex;flex-direction:column;align-items:center;gap:12px}
 .empty-state .material-symbols-outlined{font-size:32px;color:var(--border2)}
+
+/* ── Modal de confirmação ── */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.55);display:flex;align-items:center;justify-content:center;z-index:500;padding:20px}
+.modal-card{width:100%;max-width:380px;background:var(--card-bg);border:1px solid var(--card-border);border-radius:var(--radius-lg);box-shadow:var(--shadow-modal)}
+.modal-header{padding:16px 18px;border-bottom:1px solid var(--border)}
+.modal-title{font-size:13.5px;font-weight:700;color:var(--text)}
+.modal-body{padding:14px 18px}
+.modal-desc{font-size:12px;color:var(--text3);line-height:1.65;margin-bottom:12px}
+.modal-list{display:flex;flex-direction:column;gap:7px}
+.modal-list-item{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text)}
+.modal-dot{width:4px;height:4px;border-radius:50%;background:var(--text3);flex-shrink:0}
+.modal-footer{padding:12px 18px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:8px}
+.btn-outline-gold{background:transparent;border:1px solid rgba(240,187,62,0.45);color:var(--gold);display:inline-flex;align-items:center;gap:7px;border-radius:var(--radius-sm);font-size:13px;font-weight:600;cursor:pointer;padding:9px 15px;font-family:'DM Sans',sans-serif;transition:all .14s var(--ease)}
+.btn-outline-gold:hover{background:var(--gold-soft);border-color:var(--gold)}
 </style>
 </head>
 <body>
@@ -347,6 +361,10 @@ td.pct-cell{text-align:right;color:var(--text3);font-family:'DM Mono',monospace;
           <span class="material-symbols-outlined" style="font-size:16px">sync</span>
           Atualizar dados
         </button>
+        <button class="btn btn-ghost" id="btnLimparTudo" title="Apaga os dados salvos neste navegador">
+          <span class="material-symbols-outlined" style="font-size:16px">delete_sweep</span>
+          Limpar tudo
+        </button>
       </div>
     </div>
 
@@ -403,6 +421,24 @@ td.pct-cell{text-align:right;color:var(--text3);font-family:'DM Mono',monospace;
       </div>
     </div>
 
+  </div>
+
+  <div class="modal-overlay" id="modalLimparOverlay" style="display:none">
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modalLimparTitle">
+      <div class="modal-header"><div class="modal-title" id="modalLimparTitle">Limpar dados salvos</div></div>
+      <div class="modal-body">
+        <div class="modal-desc">Esta ação remove permanentemente, deste navegador:</div>
+        <div class="modal-list">
+          <div class="modal-list-item"><span class="modal-dot"></span>Base de clientes carregada</div>
+          <div class="modal-list-item"><span class="modal-dot"></span>Relatório de PL processado</div>
+          <div class="modal-list-item"><span class="modal-dot"></span>Filtros e seleções aplicadas</div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" id="modalLimparCancelar">Cancelar</button>
+        <button class="btn btn-outline-gold" id="modalLimparConfirmar">Confirmar</button>
+      </div>
+    </div>
   </div>
 
 </main>
@@ -641,6 +677,39 @@ document.getElementById('btnProcessar').addEventListener('click', async ()=>{
 });
 
 document.getElementById('btnAtualizar').addEventListener('click', ()=>{
+  arquivoBase = null; arquivoPL = null;
+  document.getElementById('dropBase').classList.remove('ok');
+  document.getElementById('dropPL').classList.remove('ok');
+  document.getElementById('dropBaseFile').textContent = '';
+  document.getElementById('dropPLFile').textContent = '';
+  document.getElementById('fileBase').value = '';
+  document.getElementById('filePL').value = '';
+  document.getElementById('btnProcessar').disabled = true;
+  document.getElementById('btnProcessar').innerHTML = '<span class="material-symbols-outlined" style="font-size:16px">insights</span>Processar e montar dashboard';
+  limparErroUpload();
+  document.getElementById('dashView').style.display = 'none';
+  document.getElementById('uploadView').style.display = 'flex';
+});
+
+function abrirModalLimpar(){
+  document.getElementById('modalLimparOverlay').style.display = 'flex';
+}
+function fecharModalLimpar(){
+  document.getElementById('modalLimparOverlay').style.display = 'none';
+}
+document.getElementById('btnLimparTudo').addEventListener('click', abrirModalLimpar);
+document.getElementById('modalLimparCancelar').addEventListener('click', fecharModalLimpar);
+document.getElementById('modalLimparOverlay').addEventListener('click', e=>{
+  if (e.target.id === 'modalLimparOverlay') fecharModalLimpar();
+});
+document.addEventListener('keydown', e=>{
+  if (e.key === 'Escape' && document.getElementById('modalLimparOverlay').style.display === 'flex') fecharModalLimpar();
+});
+document.getElementById('modalLimparConfirmar').addEventListener('click', ()=>{
+  fecharModalLimpar();
+  try { localStorage.removeItem(LS_KEY); } catch(e) {}
+  CLIENTES = [];
+  DATA_REF = null;
   arquivoBase = null; arquivoPL = null;
   document.getElementById('dropBase').classList.remove('ok');
   document.getElementById('dropPL').classList.remove('ok');
