@@ -187,6 +187,7 @@ body.light .hub-topbar {
 .faixa-row.ativa .faixa-pct{color:var(--gold)}
 .faixa-meta{display:flex;flex-direction:column;align-items:flex-end;flex:1;min-width:0}
 .faixa-count{font-size:12.5px;font-weight:400;color:var(--text);font-family:'DM Mono',monospace}
+.faixa-count-pct{color:var(--text3);font-size:11px}
 .faixa-aum{font-size:10.5px;color:var(--text3);font-family:'DM Mono',monospace;margin-top:1px}
 .faixas-resumo{display:flex;align-items:center;justify-content:space-between;gap:12px;background:var(--bg3);border:1px solid var(--gold);border-radius:var(--radius-md);padding:11px 15px;margin-bottom:.9rem}
 .faixas-resumo-label{font-size:12px;color:var(--gold);font-weight:600}
@@ -583,6 +584,32 @@ async function lerRelatorioPL(file){
       if (d && (!maxDate || d > maxDate)) maxDate = d;
     }
   });
+
+  // Soma opcional da aba "posicao_fora_xp" (ativos do cliente fora da XP) aos clientes que já existem em posicao_total
+  const nomeAbaForaXP = wb.SheetNames.find(n => normalizarHeader(n) === 'posicao fora xp');
+  if (nomeAbaForaXP) {
+    const sheetForaXP = wb.Sheets[nomeAbaForaXP];
+    const linhasForaXP = XLSX.utils.sheet_to_json(sheetForaXP, { defval: null });
+    if (linhasForaXP.length) {
+      const chavesForaXP = Object.keys(linhasForaXP[0]);
+      const mapaForaXP = {};
+      chavesForaXP.forEach(k=>{
+        const norm = normalizarHeader(k);
+        if (norm === 'clientid' || norm === 'client id') mapaForaXP.clientId = k;
+        if (norm === 'fora da xp') mapaForaXP.valor = k;
+      });
+      if (mapaForaXP.clientId && mapaForaXP.valor) {
+        linhasForaXP.forEach(l=>{
+          const cod = normCodigo(l[mapaForaXP.clientId]);
+          if (!cod) return;
+          if (!porCliente.hasOwnProperty(cod)) return; // só soma em clientes que já existem em posicao_total
+          const valor = parseFloat(l[mapaForaXP.valor]) || 0;
+          porCliente[cod] += valor;
+        });
+      }
+    }
+  }
+
   return { porCliente, dataRef: maxDate };
 }
 
@@ -816,10 +843,11 @@ function filtroAtiva(){
 
 function renderFaixas(){
   const totalGeralAum = CLIENTES.reduce((s,c)=>s+c.patrimonio,0) || 1;
+  const totalGeralClientes = CLIENTES.length || 1;
   const stats = FAIXAS.map((f,i)=>{
     const clientesFaixa = CLIENTES.filter(c => c.patrimonio >= f.min && c.patrimonio < f.max);
     const aum = clientesFaixa.reduce((s,c)=>s+c.patrimonio,0);
-    return { ...f, idx: i, count: clientesFaixa.length, aum, pct: aum/totalGeralAum*100 };
+    return { ...f, idx: i, count: clientesFaixa.length, aum, pct: aum/totalGeralAum*100, pctClientes: clientesFaixa.length/totalGeralClientes*100 };
   });
   const maxAum = Math.max(...stats.map(s=>s.aum), 1);
   const el = document.getElementById('faixasList');
@@ -829,7 +857,7 @@ function renderFaixas(){
       <div class="faixa-bar-track"><div class="faixa-bar-fill" style="width:${(s.aum/maxAum*100).toFixed(1)}%"></div></div>
       <span class="faixa-pct">${s.pct.toFixed(1)}%</span>
       <div class="faixa-meta">
-        <span class="faixa-count">${s.count} cliente${s.count===1?'':'s'}</span>
+        <span class="faixa-count">${s.count} cliente${s.count===1?'':'s'} <span class="faixa-count-pct">(${s.pctClientes.toFixed(1).replace('.',',')}%)</span></span>
         <span class="faixa-aum">${fmtBRLCompacto(s.aum)}</span>
       </div>
     </div>`).join('');
@@ -840,7 +868,8 @@ function renderFaixas(){
     const pctSoma = selecionadas.reduce((s,f)=>s+f.pct,0);
     const aumSoma = selecionadas.reduce((s,f)=>s+f.aum,0);
     const countSoma = selecionadas.reduce((s,f)=>s+f.count,0);
-    resumo.innerHTML = `<span class="faixas-resumo-label">${filtro.faixaIdxs.length} faixas selecionadas · ${countSoma} clientes</span><span class="faixas-resumo-val">${fmtBRLCompacto(aumSoma)} · ${pctSoma.toFixed(1).replace('.',',')}% do AUM total</span>`;
+    const pctClientesSoma = countSoma/totalGeralClientes*100;
+    resumo.innerHTML = `<span class="faixas-resumo-label">${filtro.faixaIdxs.length} faixas selecionadas · ${countSoma} clientes (${pctClientesSoma.toFixed(1).replace('.',',')}%)</span><span class="faixas-resumo-val">${fmtBRLCompacto(aumSoma)} · ${pctSoma.toFixed(1).replace('.',',')}% do AUM total</span>`;
     resumo.style.display = 'flex';
   } else {
     resumo.style.display = 'none';
